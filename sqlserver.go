@@ -14,6 +14,7 @@ type SqlServerCommander struct {
 	escapedArgs []string
 	connectInfo ConnectInfo
 	query       string
+	term        string
 }
 
 func NewSqlServerCommander(args []string) *SqlServerCommander {
@@ -21,6 +22,7 @@ func NewSqlServerCommander(args []string) *SqlServerCommander {
 	c.originalArgs = args
 	c.escapedArgs = make([]string, 0)
 	c.connectInfo = ConnectInfo{}
+	c.term = "dumb"
 	c.parseArgs(args)
 	return c
 }
@@ -88,6 +90,14 @@ func (m *SqlServerCommander) parseArgs(args []string) {
 			// Do Nothing
 		case strings.HasPrefix(arg, "-i"):
 			// Do Nothing
+		case strings.HasPrefix(arg, "-T"):
+			if arg == "-T" {
+				i++
+				arg = args[i]
+			} else {
+				arg = strings.TrimPrefix(arg, "-T")
+			}
+			m.term = arg
 		case strings.HasPrefix(arg, "-"):
 			if len(arg) == 2 {
 				m.escapedArgs = append(m.escapedArgs, arg)
@@ -114,19 +124,39 @@ func (m *SqlServerCommander) Query() string {
 
 func (m *SqlServerCommander) Command() string {
 	// sqlcmdCommand := fmt.Sprintf("/opt/mssql-tools/bin/sqlcmd -S %s -U $SECRET_DB_USER -P $SECRET_DB_PASSWORD -d %s -W -i /sql/query.sql", s, d)
+	serverPort := m.connectInfo.Server
+	if m.connectInfo.Port != "" {
+		serverPort = fmt.Sprintf("%s,%s", m.connectInfo.Server, m.connectInfo.Port)
+	}
 	connectionArgs := []string{
 		"/opt/mssql-tools/bin/sqlcmd",
-		"-S", fmt.Sprintf("%s,%s", m.connectInfo.Server, m.connectInfo.Port),
+		"-S", serverPort,
 		"-U", "$SECRET_DB_USER",
 		"-P", "$SECRET_DB_PASSWORD",
-		"-d", m.connectInfo.DbName,
 		"-i", "/sql/query.sql",
+	}
+	if m.connectInfo.DbName != "" {
+		connectionArgs = append(connectionArgs, "-d", m.connectInfo.DbName)
 	}
 	return fmt.Sprintf(strings.Join(slices.Concat(connectionArgs, m.escapedArgs), " "))
 }
 
 func (m *SqlServerCommander) InteractiveCommand() string {
-	return ""
+	serverPort := m.connectInfo.Server
+	if m.connectInfo.Port != "" {
+		serverPort = fmt.Sprintf("%s,%s", m.connectInfo.Server, m.connectInfo.Port)
+	}
+	connectionArgs := []string{
+		fmt.Sprintf("export TERM=%s;", m.term),
+		"/opt/mssql-tools/bin/sqlcmd",
+		"-S", serverPort,
+		"-U", "$SECRET_DB_USER",
+		"-P", "$SECRET_DB_PASSWORD",
+	}
+	if m.connectInfo.DbName != "" {
+		connectionArgs = append(connectionArgs, "-d", m.connectInfo.DbName)
+	}
+	return fmt.Sprintf(strings.Join(slices.Concat(connectionArgs, m.escapedArgs), " "))
 }
 
 func (m *SqlServerCommander) ContainerImage() string {
@@ -150,10 +180,11 @@ func (m *SqlServerCommander) ParseResults(result string) []string {
 
 func SQLServerCommands() *cli.Command {
 	return &cli.Command{
-		Name:      "sqlcmd",
-		Usage:     "execute sqlcmd commands",
-		ArgsUsage: "<sqlcmd options>",
-		Action:    executeSqlServerAction,
+		Name:            "sqlcmd",
+		Usage:           "execute sqlcmd commands",
+		ArgsUsage:       "<sqlcmd options>",
+		SkipFlagParsing: true,
+		Action:          executeSqlServerAction,
 	}
 }
 
@@ -166,6 +197,10 @@ func executeSqlServerAction(c *cli.Context) error {
 		return err
 	}
 	dbCommander := NewSqlServerCommander(c.Args().Slice())
+
+	if dbCommander.IsInteractive() {
+		return ExecPod("default" /*FIXME*/, podName, dbCommander)
+	}
 
 	out, err := RunPod("default" /*FIXME*/, podName, dbCommander)
 	if err != nil {

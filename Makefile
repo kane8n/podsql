@@ -68,3 +68,6 @@ run: fmt vet ## Run a controller from your host.
 
 deploy-mysql: ## Deploy MySQL in the kind cluster.
 	kubectl apply -f ${KIND_CLUSTER_CONFIG_DIR}/mysql.yaml
+
+deploy-sqlserver: ## Deploy SQL Server in the kind cluster.
+	kubectl apply -f ${KIND_CLUSTER_CONFIG_DIR}/sqlserver.yaml
