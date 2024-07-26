@@ -28,7 +28,7 @@ type DBCommander interface {
 	ParseResults(result string) []string
 	IsInteractive() bool
 
-	parseArgs(args []string)
+	parseArgs(args []string) error
 }
 
 type ConnectInfo struct {

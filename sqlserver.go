@@ -14,7 +14,6 @@ type SqlServerCommander struct {
 	escapedArgs []string
 	connectInfo ConnectInfo
 	query       string
-	term        string
 }
 
 func NewSqlServerCommander(args []string) *SqlServerCommander {
@@ -22,12 +21,11 @@ func NewSqlServerCommander(args []string) *SqlServerCommander {
 	c.originalArgs = args
 	c.escapedArgs = make([]string, 0)
 	c.connectInfo = ConnectInfo{}
-	c.term = "dumb"
 	c.parseArgs(args)
 	return c
 }
 
-func (m *SqlServerCommander) parseArgs(args []string) {
+func (m *SqlServerCommander) parseArgs(args []string) error {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		switch {
@@ -90,14 +88,6 @@ func (m *SqlServerCommander) parseArgs(args []string) {
 			// Do Nothing
 		case strings.HasPrefix(arg, "-i"):
 			// Do Nothing
-		case strings.HasPrefix(arg, "-T"):
-			if arg == "-T" {
-				i++
-				arg = args[i]
-			} else {
-				arg = strings.TrimPrefix(arg, "-T")
-			}
-			m.term = arg
 		case strings.HasPrefix(arg, "-"):
 			if len(arg) == 2 {
 				m.escapedArgs = append(m.escapedArgs, arg)
@@ -108,6 +98,7 @@ func (m *SqlServerCommander) parseArgs(args []string) {
 			m.escapedArgs = append(m.escapedArgs, fmt.Sprintf("\"%s\"", arg))
 		}
 	}
+	return nil
 }
 
 func (m *SqlServerCommander) IsInteractive() bool {
@@ -147,7 +138,6 @@ func (m *SqlServerCommander) InteractiveCommand() string {
 		serverPort = fmt.Sprintf("%s,%s", m.connectInfo.Server, m.connectInfo.Port)
 	}
 	connectionArgs := []string{
-		fmt.Sprintf("export TERM=%s;", m.term),
 		"/opt/mssql-tools/bin/sqlcmd",
 		"-S", serverPort,
 		"-U", "$SECRET_DB_USER",

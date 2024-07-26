@@ -25,7 +25,7 @@ func NewMysqlCommander(args []string) *MysqlCommander {
 	return c
 }
 
-func (m *MysqlCommander) parseArgs(args []string) {
+func (m *MysqlCommander) parseArgs(args []string) error {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		switch {
@@ -73,6 +73,7 @@ func (m *MysqlCommander) parseArgs(args []string) {
 			m.escapedArgs = append(m.escapedArgs, fmt.Sprintf("\"%s\"", arg))
 		}
 	}
+	return nil
 }
 
 func (m *MysqlCommander) IsInteractive() bool {

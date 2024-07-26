@@ -9,6 +9,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/kubectl/pkg/util/term"
 )
 
 func ExecPod(namespace, podName string, dbCommander DBCommander) error {
@@ -49,7 +50,7 @@ func ExecPod(namespace, podName string, dbCommander DBCommander) error {
 			Command:   []string{"/bin/sh", "-c", dbCommander.InteractiveCommand()},
 			Stdin:     true,
 			Stdout:    true,
-			Stderr:    true,
+			Stderr:    false,
 			TTY:       true,
 		}, scheme.ParameterCodec)
 
@@ -58,11 +59,20 @@ func ExecPod(namespace, podName string, dbCommander DBCommander) error {
 		return fmt.Errorf("failed to create executor: %w", err)
 	}
 
-	err = exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
-		Stdin:  os.Stdin,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
-		Tty:    true,
+	tty := term.TTY{
+		Out: os.Stdout,
+		In:  os.Stdin,
+		Raw: true,
+	}
+
+	err = tty.Safe(func() error {
+		return exec.StreamWithContext(context.Background(), remotecommand.StreamOptions{
+			Stdin:             tty.In,
+			Stdout:            tty.Out,
+			Stderr:            nil,
+			Tty:               true,
+			TerminalSizeQueue: tty.MonitorSize(tty.GetSize()),
+		})
 	})
 	if err != nil {
 		if delerr := deletePod(podsClient, podName); delerr != nil {
