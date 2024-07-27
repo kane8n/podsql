@@ -14,6 +14,7 @@ type SqlServerCommander struct {
 	escapedArgs []string
 	connectInfo ConnectInfo
 	query       string
+	help        bool
 }
 
 func NewSqlServerCommander(args []string) *SqlServerCommander {
@@ -29,6 +30,9 @@ func (m *SqlServerCommander) parseArgs(args []string) error {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		switch {
+		case arg == "-?" || arg == "--help":
+			m.help = true
+			break
 		case strings.HasPrefix(arg, "-S"):
 			if arg == "-S" {
 				i++
@@ -102,7 +106,7 @@ func (m *SqlServerCommander) parseArgs(args []string) error {
 }
 
 func (m *SqlServerCommander) IsInteractive() bool {
-	return m.query == ""
+	return m.query == "" && !m.help
 }
 
 func (m *SqlServerCommander) ConnectInfo() ConnectInfo {
@@ -113,8 +117,15 @@ func (m *SqlServerCommander) Query() string {
 	return m.query
 }
 
+func (m *SqlServerCommander) HelpCommand() string {
+	return "/opt/mssql-tools/bin/sqlcmd -?"
+}
+
 func (m *SqlServerCommander) Command() string {
-	// sqlcmdCommand := fmt.Sprintf("/opt/mssql-tools/bin/sqlcmd -S %s -U $SECRET_DB_USER -P $SECRET_DB_PASSWORD -d %s -W -i /sql/query.sql", s, d)
+	if m.help {
+		return m.HelpCommand()
+	}
+
 	serverPort := m.connectInfo.Server
 	if m.connectInfo.Port != "" {
 		serverPort = fmt.Sprintf("%s,%s", m.connectInfo.Server, m.connectInfo.Port)

@@ -17,6 +17,8 @@ type PostgresCommander struct {
 	escapedArgs []string
 	connectInfo ConnectInfo
 	query       []string
+	help        bool
+	helpCommand string
 }
 
 func NewPostgresCommander(args []string) (*PostgresCommander, error) {
@@ -34,6 +36,12 @@ func (m *PostgresCommander) parseArgs(args []string) error {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		switch {
+		case arg == "-?" || arg == "--help":
+			m.help = true
+			break
+		case strings.HasPrefix(arg, "--help="):
+			m.help = true
+			m.helpCommand = strings.Split(arg, "=")[1]
 		case arg == "-h" || arg == "--host":
 			i++
 			m.connectInfo.Server = args[i]
@@ -207,7 +215,7 @@ func (m *PostgresCommander) readFile(file, commentPrefix string) ([]string, erro
 }
 
 func (m *PostgresCommander) IsInteractive() bool {
-	return len(m.query) == 0
+	return len(m.query) == 0 && !m.help
 }
 
 func (m *PostgresCommander) ConnectInfo() ConnectInfo {
@@ -218,7 +226,18 @@ func (m *PostgresCommander) Query() string {
 	return strings.Join(m.query, "\n")
 }
 
+func (m *PostgresCommander) HelpCommand() string {
+	if m.helpCommand != "" {
+		return fmt.Sprintf("psql --help=%s", m.helpCommand)
+	}
+	return "psql --help"
+}
+
 func (m *PostgresCommander) Command() string {
+	if m.help {
+		return m.HelpCommand()
+	}
+
 	connectionArgs := []string{
 		"psql",
 		"-h", m.connectInfo.Server,

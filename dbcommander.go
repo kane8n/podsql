@@ -20,6 +20,7 @@ const (
 type DBCommander interface {
 	ConnectInfo() ConnectInfo
 	Query() string
+	HelpCommand() string
 	Command() string
 	InteractiveCommand() string
 	ContainerImage() string

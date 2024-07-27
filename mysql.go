@@ -14,6 +14,7 @@ type MysqlCommander struct {
 	escapedArgs []string
 	connectInfo ConnectInfo
 	query       string
+	help        bool
 }
 
 func NewMysqlCommander(args []string) *MysqlCommander {
@@ -29,6 +30,9 @@ func (m *MysqlCommander) parseArgs(args []string) error {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		switch {
+		case arg == "-I" || arg == "--help" || arg == "-?":
+			m.help = true
+			break
 		case arg == "-h" || arg == "--host":
 			i++
 			m.connectInfo.Server = args[i]
@@ -77,7 +81,7 @@ func (m *MysqlCommander) parseArgs(args []string) error {
 }
 
 func (m *MysqlCommander) IsInteractive() bool {
-	return m.query == ""
+	return m.query == "" && !m.help
 }
 
 func (m *MysqlCommander) ConnectInfo() ConnectInfo {
@@ -88,7 +92,15 @@ func (m *MysqlCommander) Query() string {
 	return m.query
 }
 
+func (m *MysqlCommander) HelpCommand() string {
+	return "mysql --help"
+}
+
 func (m *MysqlCommander) Command() string {
+	if m.help {
+		return m.HelpCommand()
+	}
+
 	connectionArgs := []string{
 		"mysql",
 		"-h", m.connectInfo.Server,
