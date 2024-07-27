@@ -297,7 +297,6 @@ func executePostgresAction(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	results := ParseSQLResults(out)
-	fmt.Println(strings.Join(results, "\n"))
+	fmt.Println(out)
 	return nil
 }
