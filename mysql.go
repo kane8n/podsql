@@ -145,10 +145,6 @@ func MysqlCommands() *cli.Command {
 }
 
 func executeMysqlAction(c *cli.Context) error {
-	if c.NArg() == 0 {
-		// FIXME: run pod & print help
-		return fmt.Errorf("query is required")
-	}
 	config, err := NewConfig(c)
 	if err != nil {
 		return err
@@ -157,7 +153,11 @@ func executeMysqlAction(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	dbCommander := NewMysqlCommander(c.Args().Slice())
+	args := c.Args().Slice()
+	if len(args) == 0 {
+		args = []string{"--help"}
+	}
+	dbCommander := NewMysqlCommander(args)
 
 	if dbCommander.IsInteractive() {
 		return ExecPod(config, podName, dbCommander)
