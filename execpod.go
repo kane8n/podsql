@@ -12,25 +12,25 @@ import (
 	"k8s.io/kubectl/pkg/util/term"
 )
 
-func ExecPod(namespace, podName string, dbCommander DBCommander) error {
+func ExecPod(conf *Config, podName string, dbCommander DBCommander) error {
 	clientset, config, err := newClientset()
 	if err != nil {
 		return fmt.Errorf("failed to create clientset: %w", err)
 	}
 
 	// Define specifications to create pods
-	podSpec := createExecPodSpec(podName, namespace, dbCommander)
+	podSpec := createExecPodSpec(podName, conf.Namespace, conf.Timezone, dbCommander)
 
 	// create pods
-	podsClient := clientset.CoreV1().Pods(namespace)
+	podsClient := clientset.CoreV1().Pods(conf.Namespace)
 	pod, err := podsClient.Create(context.Background(), podSpec, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create pod: %w", err)
 	}
 
 	// Create Secret for DB_USER and DB_PASSWORD with argument values
-	secret := createBasicAuthSecretSpec(fmt.Sprintf("%s-secret", podName), namespace, dbCommander.ConnectInfo(), pod)
-	_, err = clientset.CoreV1().Secrets(namespace).Create(context.Background(), secret, metav1.CreateOptions{})
+	secret := createBasicAuthSecretSpec(fmt.Sprintf("%s-secret", podName), conf.Namespace, dbCommander.ConnectInfo(), pod)
+	_, err = clientset.CoreV1().Secrets(conf.Namespace).Create(context.Background(), secret, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create secret: %w", err)
 	}
@@ -43,7 +43,7 @@ func ExecPod(namespace, podName string, dbCommander DBCommander) error {
 		Post().
 		Resource("pods").
 		Name(podName).
-		Namespace(namespace).
+		Namespace(conf.Namespace).
 		SubResource("exec").
 		VersionedParams(&corev1.PodExecOptions{
 			Container: dbCommander.CommandType().String(),
@@ -88,7 +88,7 @@ func ExecPod(namespace, podName string, dbCommander DBCommander) error {
 	return nil
 }
 
-func createExecPodSpec(podName, namespace string, dbCommander DBCommander) *corev1.Pod {
+func createExecPodSpec(podName, namespace, timezone string, dbCommander DBCommander) *corev1.Pod {
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
@@ -99,7 +99,7 @@ func createExecPodSpec(podName, namespace string, dbCommander DBCommander) *core
 				{
 					Name:    dbCommander.CommandType().String(),
 					Image:   dbCommander.ContainerImage(),
-					Env:     append(generateSecretEnvVars(podName, dbCommander), corev1.EnvVar{Name: "TZ", Value: "Asia/Tokyo"}), // FIXME
+					Env:     append(generateSecretEnvVars(podName, dbCommander), corev1.EnvVar{Name: "TZ", Value: timezone}),
 					Command: []string{"/bin/sh", "-c", "tail -f /dev/null"},
 				},
 			},

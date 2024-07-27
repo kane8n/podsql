@@ -3,6 +3,7 @@ module podsql
 go 1.22.4
 
 require (
+	github.com/go-yaml/yaml v2.1.0+incompatible
 	github.com/urfave/cli/v2 v2.27.2
 	k8s.io/api v0.30.3
 	k8s.io/apimachinery v0.30.3

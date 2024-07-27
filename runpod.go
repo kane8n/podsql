@@ -11,7 +11,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func RunPod(namespace, podName string, dbCommander DBCommander) (string, error) {
+func RunPod(conf *Config, podName string, dbCommander DBCommander) (string, error) {
 	clientset, _, err := newClientset()
 	if err != nil {
 		return "", fmt.Errorf("failed to create clientset: %w", err)
@@ -20,10 +20,10 @@ func RunPod(namespace, podName string, dbCommander DBCommander) (string, error) 
 	cmName := fmt.Sprintf("%s-cm", podName)
 
 	// Define specifications to create pods
-	podSpec := createRunPodSpec(podName, namespace, cmName, dbCommander)
+	podSpec := createRunPodSpec(podName, conf.Namespace, cmName, conf.Timezone, dbCommander)
 
 	// create pods
-	podsClient := clientset.CoreV1().Pods(namespace)
+	podsClient := clientset.CoreV1().Pods(conf.Namespace)
 	pod, err := podsClient.Create(context.Background(), podSpec, metav1.CreateOptions{})
 	if err != nil {
 		return "", fmt.Errorf("failed to create pod: %w", err)
@@ -31,15 +31,15 @@ func RunPod(namespace, podName string, dbCommander DBCommander) (string, error) 
 
 	// Create ConfigMap to hold queries
 	// Because the -Q option of sqlcmd does not allow queries over 1K to be executed, use ConfigMap to transfer the sql file to the pod and execute it with the -i option.
-	configMap := createConfigMapSpec(cmName, namespace, pod, map[string]string{"query.sql": dbCommander.Query()})
-	_, err = clientset.CoreV1().ConfigMaps(namespace).Create(context.Background(), configMap, metav1.CreateOptions{})
+	configMap := createConfigMapSpec(cmName, conf.Namespace, pod, map[string]string{"query.sql": dbCommander.Query()})
+	_, err = clientset.CoreV1().ConfigMaps(conf.Namespace).Create(context.Background(), configMap, metav1.CreateOptions{})
 	if err != nil {
 		return "", fmt.Errorf("failed to create configmap: %w", err)
 	}
 
 	// Create Secret for DB_USER and DB_PASSWORD with argument values
-	secret := createBasicAuthSecretSpec(fmt.Sprintf("%s-secret", podName), namespace, dbCommander.ConnectInfo(), pod)
-	_, err = clientset.CoreV1().Secrets(namespace).Create(context.Background(), secret, metav1.CreateOptions{})
+	secret := createBasicAuthSecretSpec(fmt.Sprintf("%s-secret", podName), conf.Namespace, dbCommander.ConnectInfo(), pod)
+	_, err = clientset.CoreV1().Secrets(conf.Namespace).Create(context.Background(), secret, metav1.CreateOptions{})
 	if err != nil {
 		return "", fmt.Errorf("failed to create secret: %w", err)
 	}
@@ -103,7 +103,7 @@ func RunPod(namespace, podName string, dbCommander DBCommander) (string, error) 
 	return string(logs), nil
 }
 
-func createRunPodSpec(podName, namespace, cmName string, dbCommander DBCommander) *corev1.Pod {
+func createRunPodSpec(podName, namespace, cmName, timezone string, dbCommander DBCommander) *corev1.Pod {
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podName,
@@ -127,7 +127,7 @@ func createRunPodSpec(podName, namespace, cmName string, dbCommander DBCommander
 					Name:         dbCommander.CommandType().String(),
 					Image:        dbCommander.ContainerImage(),
 					VolumeMounts: []corev1.VolumeMount{{Name: "query-volume", MountPath: "/sql"}},
-					Env:          append(generateSecretEnvVars(podName, dbCommander), corev1.EnvVar{Name: "TZ", Value: "Asia/Tokyo"}), // FIXME
+					Env:          append(generateSecretEnvVars(podName, dbCommander), corev1.EnvVar{Name: "TZ", Value: timezone}),
 					Command:      []string{"/bin/sh", "-c", dbCommander.Command()},
 				},
 			},

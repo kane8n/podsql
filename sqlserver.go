@@ -180,7 +180,12 @@ func SQLServerCommands() *cli.Command {
 
 func executeSqlServerAction(c *cli.Context) error {
 	if c.NArg() == 0 {
+		// FIXME: run pod & print help
 		return fmt.Errorf("query is required")
+	}
+	config, err := NewConfig(c)
+	if err != nil {
+		return err
 	}
 	podName, err := CreatePodName("podsql")
 	if err != nil {
@@ -189,10 +194,10 @@ func executeSqlServerAction(c *cli.Context) error {
 	dbCommander := NewSqlServerCommander(c.Args().Slice())
 
 	if dbCommander.IsInteractive() {
-		return ExecPod("default" /*FIXME*/, podName, dbCommander)
+		return ExecPod(config, podName, dbCommander)
 	}
 
-	out, err := RunPod("default" /*FIXME*/, podName, dbCommander)
+	out, err := RunPod(config, podName, dbCommander)
 	if err != nil {
 		return err
 	}
